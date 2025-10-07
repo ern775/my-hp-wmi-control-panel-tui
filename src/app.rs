@@ -1,25 +1,42 @@
-use std::io;
+use std::{
+    io,
+    thread::sleep,
+    time::{Duration, Instant},
+};
 
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     DefaultTerminal, Frame,
     layout::{Constraint, Direction, Layout},
+    widgets::Paragraph,
 };
 
-use crate::widgets::counter::Counter;
+use crate::widgets::{counter::Counter, fans_widget::FansWidget};
 
 pub struct App {
     pub exit: bool,
 
     // widgets:
     pub counter: Counter,
+    pub fans_widget: FansWidget,
 }
 
 impl App {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+        let mut last_update = Instant::now();
+
         while !self.exit {
-            terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events()?;
+            // Always redraw every 1000 / 30 = 33 milliseconds
+            if last_update.elapsed() >= Duration::from_millis(33) {
+                terminal.draw(|frame| self.draw(frame))?;
+                last_update = Instant::now();
+            }
+
+            if event::poll(Duration::from_millis(0))? {
+                self.handle_events()?;
+            }
+
+            sleep(Duration::from_millis(1));
         }
         Ok(())
     }
@@ -49,17 +66,19 @@ impl App {
 
     fn render(&mut self, frame: &mut Frame) {
         let main_layout = Layout::default()
+            .horizontal_margin(20)
+            .vertical_margin(5)
             .direction(Direction::Vertical)
             .constraints(vec![
+                Constraint::Length(3),
                 Constraint::Fill(1),
-                Constraint::Fill(1),
-                Constraint::Fill(1),
+                Constraint::Length(3),
             ])
             .split(frame.area());
 
-        let (counter_area, _area_1, _area_2) = (main_layout[0], main_layout[1], main_layout[2]);
+        let (_header, fans_area, _area_2) = (main_layout[0], main_layout[1], main_layout[2]);
 
-        frame.render_widget(&self.counter, counter_area);
+        frame.render_widget(&self.fans_widget, fans_area);
     }
 
     fn exit(&mut self) {
@@ -75,6 +94,7 @@ impl Default for App {
                 title: "X",
                 count: 0,
             },
+            fans_widget: FansWidget::new("Fans"),
         }
     }
 }
