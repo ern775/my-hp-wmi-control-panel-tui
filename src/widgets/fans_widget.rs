@@ -1,6 +1,6 @@
 use std::{
     fs::{self, OpenOptions},
-    io::{self, Write},
+    io::{self, Read, Write},
     process::Command,
 };
 
@@ -23,9 +23,36 @@ impl Fan {
         Self { id: id }
     }
 
-    pub fn set_target_speed(&self, speed: usize) -> io::Result<()> {
-        // TODO
-        // gotta check if the given speed is higher than the max speed
+    pub fn get_max_fan_speed(&self) -> io::Result<u16> {
+        let pattern = format!(
+            "/sys/devices/platform/hp-wmi/hwmon/hwmon*/fan{}_max",
+            self.id
+        );
+
+        let path = glob(&pattern)
+            .expect("failed to read fan_max")
+            .filter_map(Result::ok)
+            .next()
+            .expect("no fan max file found");
+
+        let mut file = OpenOptions::new().read(true).open(path)?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents)?;
+
+        let number: u16 = contents
+            .trim()
+            .parse()
+            .expect("failed to parse the number from fan_max");
+
+        Ok(number)
+    }
+
+    pub fn set_target_speed(&self, mut speed: u16) -> io::Result<()> {
+        let max_speed = self.get_max_fan_speed()?;
+
+        if speed > max_speed {
+            speed = max_speed
+        }
 
         let pattern = format!(
             "/sys/devices/platform/hp-wmi/hwmon/hwmon*/fan{}_target",
