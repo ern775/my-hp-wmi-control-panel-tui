@@ -7,11 +7,16 @@ use std::{
 use glob::glob;
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Layout},
-    style::Stylize,
-    text::Line,
-    widgets::{Block, BorderType, Borders, Paragraph, Widget},
+    layout::{Constraint, Direction, Layout},
+    style::{Color, Stylize},
+    symbols::Marker,
+    widgets::{
+        Block, BorderType, Borders, Paragraph, Widget,
+        canvas::{Canvas, Circle, Line, Map, MapResolution, Rectangle},
+    },
 };
+
+use crate::margin;
 
 pub struct Fan {
     pub id: usize,
@@ -102,12 +107,31 @@ impl Fan {
 
 impl Widget for &Fan {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut Buffer) {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Fill(1), Constraint::Length(4)])
+            .split(area);
+
+        Canvas::default()
+            .block(Block::bordered().title(format!("{}", &self.id)))
+            .x_bounds([-180.0, 180.0])
+            .y_bounds([-90.0, 90.0])
+            .paint(|ctx| {
+                ctx.draw(&Circle {
+                    x: 10.0,
+                    y: 20.0,
+                    radius: 45.0,
+                    color: Color::Red,
+                });
+            })
+            .render(layout[0], buf);
+
         Paragraph::new(format!(
             "Current Speed of fan_{} : {}",
             self.id,
             self.get_cur_speed()
         ))
-        .render(area, buf);
+        .render(layout[1], buf);
     }
 }
 
@@ -123,14 +147,17 @@ impl FansWidget {
 
 impl Widget for &FansWidget {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut Buffer) {
-        let layout = Layout::vertical(vec![Constraint::Fill(1), Constraint::Fill(1)]).split(area);
-        let (visuals_area, data_area) = (layout[0], layout[1]);
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .render(area, buf);
 
         let fan1 = Fan::new(1);
         let fan2 = Fan::new(2);
 
-        let vis_area_lay =
-            Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1)]).split(visuals_area);
+        let vis_area_lay = Layout::horizontal(vec![Constraint::Fill(1), Constraint::Fill(1)])
+            .margin(1)
+            .split(area);
 
         fan1.render(vis_area_lay[0], buf);
         fan2.render(vis_area_lay[1], buf);

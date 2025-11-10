@@ -11,14 +11,23 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::widgets::{counter::Counter, fans_widget::FansWidget};
+use crate::widgets::{
+    counter::Counter, cpu_cores_widget::CoresWidget, fans_widget::FansWidget,
+    heat_widget::HeatWidget, logs_widget::Logs, navbar::Navbar,
+};
 
 pub struct App {
     pub exit: bool,
 
     // widgets:
     pub counter: Counter,
+
+    pub navbar: Navbar,
     pub fans_widget: FansWidget,
+    pub cores_widget: CoresWidget,
+
+    pub heat_widget: HeatWidget,
+    pub logs_widget: Logs,
 }
 
 impl App {
@@ -66,19 +75,37 @@ impl App {
 
     fn render(&mut self, frame: &mut Frame) {
         let main_layout = Layout::default()
-            .horizontal_margin(20)
-            .vertical_margin(5)
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Fill(2), Constraint::Fill(1)])
+            .split(frame.area());
+
+        let (left_col, right_col) = (main_layout[0], main_layout[1]);
+
+        let left_col_layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints(vec![
                 Constraint::Length(3),
                 Constraint::Fill(1),
-                Constraint::Length(3),
+                Constraint::Length(10),
             ])
-            .split(frame.area());
+            .split(left_col);
 
-        let (_header, fans_area, _area_2) = (main_layout[0], main_layout[1], main_layout[2]);
+        let (navbar_area, fanwidget_area, core_usage_area) =
+            (left_col_layout[0], left_col_layout[1], left_col_layout[2]);
 
-        frame.render_widget(&self.fans_widget, fans_area);
+        let right_col_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Fill(3), Constraint::Fill(2)])
+            .split(right_col);
+
+        let (heat_area, logs_area) = (right_col_layout[0], right_col_layout[1]);
+
+        frame.render_widget(&self.navbar, navbar_area);
+        frame.render_widget(&self.fans_widget, fanwidget_area);
+        frame.render_widget(&self.cores_widget, core_usage_area);
+
+        frame.render_widget(&self.heat_widget, heat_area);
+        frame.render_widget(&self.logs_widget, logs_area);
     }
 
     fn exit(&mut self) {
@@ -94,7 +121,13 @@ impl Default for App {
                 title: "X",
                 count: 0,
             },
+
+            navbar: Navbar::new("Navbar"),
             fans_widget: FansWidget::new("Fans"),
+            cores_widget: CoresWidget::new("Cores"),
+
+            heat_widget: HeatWidget::new("Heat"),
+            logs_widget: Logs::new("Logs"),
         }
     }
 }
