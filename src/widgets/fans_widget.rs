@@ -114,14 +114,20 @@ impl Widget for &Fan {
 
         Canvas::default()
             .block(Block::bordered().title(format!("{}", &self.id)))
-            .x_bounds([-180.0, 180.0])
+            .x_bounds([-90.0, 90.0])
             .y_bounds([-90.0, 90.0])
             .paint(|ctx| {
                 ctx.draw(&Circle {
-                    x: 10.0,
-                    y: 20.0,
-                    radius: 45.0,
-                    color: Color::Red,
+                    x: 0.0,
+                    y: 0.0,
+                    radius: 75.0,
+                    color: Color::Blue,
+                });
+                ctx.draw(&Circle {
+                    x: 0.0,
+                    y: 0.0,
+                    radius: 5.0,
+                    color: Color::Blue,
                 });
             })
             .render(layout[0], buf);

@@ -1,7 +1,7 @@
 use std::{
     fs::{self, OpenOptions},
     path::Path,
-    process::Command,
+    process::{Command, Stdio},
 };
 
 use glob::glob;
@@ -17,15 +17,51 @@ use ratatui::{
     },
 };
 
-pub struct HeatWidget {
+use crate::margin;
+
+pub struct UsageWidget {
     pub title: &'static str,
 }
 
-impl HeatWidget {
+impl UsageWidget {
     pub fn new(title: &'static str) -> Self {
         Self { title: title }
     }
 
+    // GPU STUFF HERE
+    pub fn is_gpu_active(&self) -> bool {
+        Command::new("sh")
+            .arg("-c")
+            .arg("nvidia-smi -L")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("Couldnt run nvidia-smi")
+            .success()
+    }
+
+    pub fn get_gpu_heat(&self) -> u8 {
+        if (self.is_gpu_active()) {
+            let output = Command::new("sh")
+                .arg("-c")
+                .arg("nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits")
+                .output()
+                .expect("couldnt run nvidia-smi gpu-heat")
+                .stdout;
+
+            String::from_utf8(output)
+                .unwrap()
+                .trim()
+                .parse()
+                .expect("Couldnt parse")
+        } else {
+            // return 0 if not active,
+            // gpu heat cant be 0 anyway.
+            0
+        }
+    }
+
+    // CPU STUFF HERE
     pub fn get_cpu_temp(&self) -> u64 {
         let temp_output = Command::new("sh")
             .arg("-c")
@@ -72,48 +108,55 @@ impl HeatWidget {
     }
 
     pub fn temperature_style(&self, value: u8) -> Style {
-        let green = (255.0 * (1.0 - f64::from(value.saturating_sub(50)) / 40.0)) as u8;
+        let green = (255.0 * (1.0 - f64::from(value.saturating_sub(55)) / 40.0)) as u8;
         let color = Color::Rgb(255, green, 0);
         Style::new().fg(color)
     }
 }
 
-impl Widget for &HeatWidget {
+impl Widget for &UsageWidget {
     fn render(self, area: ratatui::prelude::Rect, buf: &mut Buffer) {
-        let block = Block::default()
+        let main_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .title(self.title)
             .padding(Padding::uniform(1));
 
-        // Create the datasets to fill the chart with
-        let temp1 = self.get_cpu_temp();
-        let temp2 = 55;
+        let heat_block = Block::default()
+            .borders(Borders::RIGHT)
+            .border_type(BorderType::Thick);
 
-        let style1 = self.temperature_style(temp1 as u8);
-        let style2 = self.temperature_style(temp2 as u8);
+        // Create the datasets to fill the chart with
+        let cpu_temp = self.get_cpu_temp();
+        let gpu_temp = self.get_gpu_heat();
+
+        let cpu_temp_style = self.temperature_style(cpu_temp as u8);
+        let gpu_temp_style = self.temperature_style(gpu_temp as u8);
 
         let bars: Vec<Bar> = vec![
             Bar::default()
-                .value(temp1)
-                .label(Line::from("temp1"))
-                .text_value(format!("{}C", temp1))
-                .style(style1)
-                .value_style(style1.reversed()),
+                .value(cpu_temp)
+                .label(Line::from("CPU"))
+                .text_value(format!(" {}ºC", cpu_temp))
+                .style(cpu_temp_style)
+                .value_style(cpu_temp_style.reversed()),
             Bar::default()
-                .value(temp2)
-                .label(Line::from("temp2"))
-                .text_value(format!("{}C", temp2))
-                .style(style2)
-                .value_style(style2.reversed()),
+                .value(gpu_temp as u64)
+                .label(Line::from("GPU"))
+                .text_value(format!(" {}ºC", gpu_temp))
+                .style(gpu_temp_style)
+                .value_style(gpu_temp_style.reversed()),
         ];
 
+        main_block.render(area, buf);
+
         BarChart::default()
-            .block(block)
+            .block(heat_block)
             .data(BarGroup::default().bars(&bars))
-            .bar_width(10)
+            .max(100)
+            .bar_width(8)
             .bar_gap(2)
             .direction(Direction::Vertical)
-            .render(area, buf);
+            .render(area.inner(margin!(2, 1)), buf);
     }
 }

@@ -12,8 +12,8 @@ use ratatui::{
 };
 
 use crate::widgets::{
-    counter::Counter, cpu_cores_widget::CoresWidget, fans_widget::FansWidget,
-    heat_widget::HeatWidget, logs_widget::Logs, navbar::Navbar,
+    counter::Counter, cpu_cores_widget::CoresWidget, fans_widget::FansWidget, logs_widget::Logs,
+    navbar::Navbar, usage_widget::UsageWidget,
 };
 
 pub struct App {
@@ -26,7 +26,7 @@ pub struct App {
     pub fans_widget: FansWidget,
     pub cores_widget: CoresWidget,
 
-    pub heat_widget: HeatWidget,
+    pub usage_widget: UsageWidget,
     pub logs_widget: Logs,
 }
 
@@ -104,7 +104,7 @@ impl App {
         frame.render_widget(&self.fans_widget, fanwidget_area);
         frame.render_widget(&self.cores_widget, core_usage_area);
 
-        frame.render_widget(&self.heat_widget, heat_area);
+        frame.render_widget(&self.usage_widget, heat_area);
         frame.render_widget(&self.logs_widget, logs_area);
     }
 
@@ -126,7 +126,7 @@ impl Default for App {
             fans_widget: FansWidget::new("Fans"),
             cores_widget: CoresWidget::new("Cores"),
 
-            heat_widget: HeatWidget::new("Heat"),
+            usage_widget: UsageWidget::new("Usage"),
             logs_widget: Logs::new("Logs"),
         }
     }
