@@ -34,7 +34,17 @@ impl App {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         let mut last_update = Instant::now();
 
+        let mut last_cpu_update = Instant::now();
+
+        self.cores_widget.update();
+
         while !self.exit {
+            let now = Instant::now();
+            if last_cpu_update.elapsed() >= Duration::from_millis(200) {
+                self.cores_widget.update();
+                last_cpu_update = now;
+            }
+
             // Always redraw every 1000 / 30 = 33 milliseconds
             if last_update.elapsed() >= Duration::from_millis(33) {
                 terminal.draw(|frame| self.draw(frame))?;

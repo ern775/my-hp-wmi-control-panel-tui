@@ -1,45 +1,47 @@
-use std::process::Command;
-
 use ratatui::{
     buffer::Buffer,
-    style::Stylize,
     text::Line,
-    widgets::{Bar, BarChart, BarGroup, Block, BorderType, Borders, Paragraph, Widget},
+    widgets::{Bar, BarChart, BarGroup, Block, BorderType, Borders, Widget},
 };
+use sysinfo::{Cpu, System};
 
 use crate::margin;
 
 pub struct CoresWidget {
     pub title: &'static str,
+    sys: System,
 }
 
 impl CoresWidget {
     pub fn new(title: &'static str) -> Self {
-        Self { title: title }
+        let mut sys = System::new_all();
+        sys.refresh_cpu();
+
+        Self { title, sys }
     }
 
-    pub fn get_cpu_count(&self) -> u8 {
-        let output = Command::new("sh")
-            .arg("-c")
-            .arg("lscpu | grep '^CPU(s):' | awk '{print $2}'")
-            .output()
-            .expect("Couldnt run lscpu");
-
-        String::from_utf8(output.stdout)
-            .unwrap()
-            .trim()
-            .parse()
-            .expect("Couldnt parse")
+    // ---------------------------------------------------------
+    // IMPORTANT: Call this function in your main app loop!
+    // e.g. every tick or every 500ms.
+    // ---------------------------------------------------------
+    pub fn update(&mut self) {
+        self.sys.refresh_cpu();
     }
 
-    // this is cool
     pub fn mk_bars(&self) -> Vec<Bar<'_>> {
-        (0..self.get_cpu_count())
-            .map(|i| {
+        self.sys
+            .cpus()
+            .iter()
+            .enumerate()
+            .map(|(i, cpu)| {
+                let usage_percent = cpu.cpu_usage(); // Returns f32 (0.0 to 100.0)
+
+                let bar_value = ((usage_percent / 10.0) as u64).max(1);
+
                 Bar::default()
-                    .value(0)
+                    .value(bar_value)
                     .label(Line::from(format!("cpu{}", i)))
-                    .text_value(String::from(""))
+                    .text_value("".to_string())
             })
             .collect()
     }
@@ -63,3 +65,4 @@ impl Widget for &CoresWidget {
             .render(area.inner(margin!(2, 1)), buf);
     }
 }
+
