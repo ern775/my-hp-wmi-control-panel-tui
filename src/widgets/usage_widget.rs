@@ -1,4 +1,5 @@
 use std::{
+    env::args_os,
     fs::{self, OpenOptions},
     path::Path,
     process::{Command, Stdio},
@@ -7,7 +8,7 @@ use std::{
 use glob::glob;
 use ratatui::{
     buffer::Buffer,
-    layout::Direction,
+    layout::{Constraint, Direction, Layout},
     style::{Color, Style, Styled, Stylize},
     symbols::Marker,
     text::Line,
@@ -112,6 +113,27 @@ impl UsageWidget {
         let color = Color::Rgb(255, green, 0);
         Style::new().fg(color)
     }
+
+    pub fn get_ram_usage(&self) -> (u64, u64) {
+        let ram_output = Command::new("sh")
+            .arg("-c")
+            .arg("free -m | awk 'NR==2{print $2, $3}'")
+            .output()
+            .expect("Couldnt run free -m");
+
+        let ram_output_str = String::from_utf8(ram_output.stdout).unwrap().to_string();
+
+        let str_split = ram_output_str.trim().split_once(" ").unwrap();
+        let (total, used) = (
+            str_split.0.parse::<u64>().unwrap(),
+            str_split
+                .1
+                .parse::<u64>()
+                .expect(&format!("{:?}", str_split)),
+        );
+
+        (total, used)
+    }
 }
 
 impl Widget for &UsageWidget {
@@ -119,8 +141,7 @@ impl Widget for &UsageWidget {
         let main_block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .title(self.title)
-            .padding(Padding::uniform(1));
+            .title(self.title);
 
         let heat_block = Block::default()
             .borders(Borders::RIGHT)
@@ -150,6 +171,11 @@ impl Widget for &UsageWidget {
 
         main_block.render(area, buf);
 
+        let layout_main = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Length(20), Constraint::Fill(2)])
+            .split(area.inner(margin!(2, 1)));
+
         BarChart::default()
             .block(heat_block)
             .data(BarGroup::default().bars(&bars))
@@ -157,6 +183,24 @@ impl Widget for &UsageWidget {
             .bar_width(8)
             .bar_gap(2)
             .direction(Direction::Vertical)
-            .render(area.inner(margin!(2, 1)), buf);
+            .render(layout_main[0], buf);
+
+        let (total, used): (u64, u64) = self.get_ram_usage();
+        let total_ram_gib = total as f64 / 1024.0;
+        let used_ram_gib = used as f64 / 1024.0;
+
+        let bars: Vec<Bar> = vec![
+            Bar::default()
+                .value(used)
+                .label(Line::from("RAM"))
+                .text_value(format!("{:.1}GiB", used_ram_gib)),
+        ];
+        BarChart::default()
+            .direction(Direction::Horizontal)
+            .bar_width(5)
+            .bar_gap(2)
+            .data(BarGroup::default().bars(&bars))
+            .max(total)
+            .render(layout_main[1], buf);
     }
 }
