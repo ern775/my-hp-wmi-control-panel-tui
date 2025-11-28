@@ -37,11 +37,13 @@ impl App {
         let mut last_cpu_update = Instant::now();
 
         self.cores_widget.update();
+        self.usage_widget.update_cpu_data();
 
         while !self.exit {
             let now = Instant::now();
             if last_cpu_update.elapsed() >= Duration::from_millis(200) {
                 self.cores_widget.update();
+                self.usage_widget.update_cpu_data();
                 last_cpu_update = now;
             }
 

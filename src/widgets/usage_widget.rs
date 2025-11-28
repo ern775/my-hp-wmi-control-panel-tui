@@ -1,6 +1,5 @@
 use std::{
-    env::args_os,
-    fs::{self, OpenOptions},
+    fs::{self},
     path::Path,
     process::{Command, Stdio},
 };
@@ -9,12 +8,12 @@ use glob::glob;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout},
-    style::{Color, Style, Styled, Stylize},
+    style::{Color, Style, Stylize},
     symbols::Marker,
     text::Line,
     widgets::{
         Axis, Bar, BarChart, BarGroup, Block, BorderType, Borders, Chart, Dataset, GraphType,
-        Padding, Paragraph, Widget,
+        LegendPosition, Widget,
     },
 };
 
@@ -22,11 +21,18 @@ use crate::margin;
 
 pub struct UsageWidget {
     pub title: &'static str,
+
+    pub cpu_data: Vec<(f64, f64)>,
+    pub chart_x_val: usize,
 }
 
 impl UsageWidget {
     pub fn new(title: &'static str) -> Self {
-        Self { title: title }
+        Self {
+            title: title,
+            cpu_data: vec![(0., 0.)],
+            chart_x_val: 1,
+        }
     }
 
     // GPU STUFF HERE
@@ -42,7 +48,7 @@ impl UsageWidget {
     }
 
     pub fn get_gpu_heat(&self) -> u8 {
-        if (self.is_gpu_active()) {
+        if self.is_gpu_active() {
             let output = Command::new("sh")
                 .arg("-c")
                 .arg("nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader,nounits")
@@ -134,6 +140,35 @@ impl UsageWidget {
 
         (total, used)
     }
+
+    pub fn get_cpu_speed(&self) -> (f64, f64) {
+        let output = Command::new("sh")
+            .arg("-c")
+            .arg(r#"lscpu | awk '/min MHz/ {min=$4} /max MHz/ {max=$4} END {printf "%.2f/%.2f\n", min/1000, max/1000}'"#)
+            .output()
+            .expect("Couldn't run lscpu");
+
+        let output_str = String::from_utf8(output.stdout).unwrap().to_string();
+
+        let cur_n_max = output_str.trim().split("/").collect::<Vec<_>>();
+        let (cur, max) = (
+            cur_n_max[0].parse::<f64>().expect("parsing err"),
+            cur_n_max[1].parse::<f64>().expect("parsing err"),
+        );
+        (cur, max)
+    }
+
+    pub fn update_cpu_data(&mut self) {
+        let (cur, max) = self.get_cpu_speed();
+
+        let new_data = (self.chart_x_val as f64, cur);
+        self.cpu_data.push(new_data);
+        if self.cpu_data.len() > 10 {
+            self.cpu_data.remove(0);
+        } else {
+            self.chart_x_val += 1;
+        }
+    }
 }
 
 impl Widget for &UsageWidget {
@@ -173,8 +208,13 @@ impl Widget for &UsageWidget {
 
         let layout_main = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Length(20), Constraint::Fill(2)])
+            .constraints(vec![Constraint::Length(20), Constraint::Fill(1)])
             .split(area.inner(margin!(2, 1)));
+
+        let second_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Length(8), Constraint::Fill(1)])
+            .split(layout_main[1]);
 
         BarChart::default()
             .block(heat_block)
@@ -186,7 +226,7 @@ impl Widget for &UsageWidget {
             .render(layout_main[0], buf);
 
         let (total, used): (u64, u64) = self.get_ram_usage();
-        let total_ram_gib = total as f64 / 1024.0;
+        let _total_ram_gib = total as f64 / 1024.0;
         let used_ram_gib = used as f64 / 1024.0;
 
         let bars: Vec<Bar> = vec![
@@ -201,6 +241,36 @@ impl Widget for &UsageWidget {
             .bar_gap(2)
             .data(BarGroup::default().bars(&bars))
             .max(total)
-            .render(layout_main[1], buf);
+            .render(second_layout[0], buf);
+
+        let (cur, max) = self.get_cpu_speed();
+
+        let datasets = vec![
+            Dataset::default()
+                .name("Line from only 2 points".italic())
+                .marker(Marker::Braille)
+                .style(Style::default().fg(Color::Yellow))
+                .graph_type(GraphType::Line)
+                .data(&self.cpu_data),
+        ];
+
+        Chart::new(datasets)
+            .x_axis(
+                Axis::default()
+                    .title("X Axis")
+                    .style(Style::default().gray())
+                    .bounds([0.0, 12.0])
+                    .labels(["0".bold(), "5.0".bold()]),
+            )
+            .y_axis(
+                Axis::default()
+                    .title("Y Axis")
+                    .style(Style::default().gray())
+                    .bounds([0.0, max])
+                    .labels(["0".bold(), format!("{}", max).bold()]),
+            )
+            .legend_position(Some(LegendPosition::TopLeft))
+            .hidden_legend_constraints((Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)))
+            .render(second_layout[1].inner(margin!(1, 0)), buf);
     }
 }

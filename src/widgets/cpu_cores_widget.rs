@@ -62,7 +62,6 @@ impl Widget for &CoresWidget {
             .max(10)
             .bar_width(6)
             .bar_gap(2)
-            .render(area.inner(margin!(2, 1)), buf);
+            .render(area, buf);
     }
 }
-
