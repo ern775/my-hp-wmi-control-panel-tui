@@ -16,7 +16,7 @@ use crate::widgets::{
     navbar::Navbar, usage_widget::UsageWidget,
 };
 
-pub struct App {
+pub struct App<'a> {
     pub exit: bool,
 
     // widgets:
@@ -27,10 +27,10 @@ pub struct App {
     pub cores_widget: CoresWidget,
 
     pub usage_widget: UsageWidget,
-    pub logs_widget: Logs,
+    pub logs_widget: Logs<'a>,
 }
 
-impl App {
+impl App<'_> {
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         let mut last_update = Instant::now();
 
@@ -120,12 +120,17 @@ impl App {
         frame.render_widget(&self.logs_widget, logs_area);
     }
 
+
+    fn push_log(&mut self) {
+        self.logs_widget.
+    }
+
     fn exit(&mut self) {
         self.exit = true;
     }
 }
 
-impl Default for App {
+impl Default for App<'_> {
     fn default() -> Self {
         Self {
             exit: false,

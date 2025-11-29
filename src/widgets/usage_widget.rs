@@ -23,7 +23,8 @@ pub struct UsageWidget {
     pub title: &'static str,
 
     pub cpu_data: Vec<(f64, f64)>,
-    pub chart_x_val: usize,
+    pub chart_x_start: f64,
+    pub chart_x_end: f64,
 }
 
 impl UsageWidget {
@@ -31,7 +32,8 @@ impl UsageWidget {
         Self {
             title: title,
             cpu_data: vec![(0., 0.)],
-            chart_x_val: 1,
+            chart_x_start: 0.,
+            chart_x_end: 1.,
         }
     }
 
@@ -161,12 +163,13 @@ impl UsageWidget {
     pub fn update_cpu_data(&mut self) {
         let (cur, max) = self.get_cpu_speed();
 
-        let new_data = (self.chart_x_val as f64, cur);
+        let new_data = (self.chart_x_end as f64, cur);
         self.cpu_data.push(new_data);
         if self.cpu_data.len() > 10 {
             self.cpu_data.remove(0);
+            self.chart_x_start += 1.;
         } else {
-            self.chart_x_val += 1;
+            self.chart_x_end += 1.;
         }
     }
 }
@@ -259,8 +262,8 @@ impl Widget for &UsageWidget {
                 Axis::default()
                     .title("X Axis")
                     .style(Style::default().gray())
-                    .bounds([0.0, 12.0])
-                    .labels(["0".bold(), "5.0".bold()]),
+                    .bounds([self.chart_x_start, self.chart_x_end])
+                    .labels(["0".bold(), "10.0".bold()]),
             )
             .y_axis(
                 Axis::default()
